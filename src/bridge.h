@@ -1,5 +1,5 @@
-#ifndef PROXY_SERVER_PSQL_BRIDGE_H_
-#define PROXY_SERVER_PSQL_BRIDGE_H_
+#ifndef PSQL_TCP_PROXY_SERVER_BRIDGE_H_
+#define PSQL_TCP_PROXY_SERVER_BRIDGE_H_
 
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -53,4 +53,4 @@ class Bridge {
 };
 }  // namespace psql_tcp
 
-#endif  // PROXY_SERVER_PSQL_BRIDGE_H_
+#endif  // PSQL_TCP_PROXY_SERVER_BRIDGE_H_
