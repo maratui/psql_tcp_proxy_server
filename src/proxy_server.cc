@@ -67,13 +67,9 @@ void ProxyServer::SetFDSet() {
 }
 
 void ProxyServer::AcceptConnection() {
-  int client_socket = accept(client_listener_, NULL, NULL);
+  int client_socket{};
 
-  utils::CheckResult(client_socket, "accept");
-
-  function_result_ = utils::SetNonblockFD(client_socket);
-  utils::CheckResult(function_result_, "SetNonblockFD");
-
+  client_socket = BerkeleySocket::AcceptConnection(client_listener_);
   bridges_.push_back(new Bridge(client_socket, kRecvRequest, filename_));
 }
 

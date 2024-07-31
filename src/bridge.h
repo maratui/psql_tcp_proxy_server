@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "berkeley_socket.h"
 #include "utils.h"
 
 namespace psql_tcp {

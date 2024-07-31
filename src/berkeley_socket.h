@@ -14,6 +14,9 @@ class BerkeleySocket {
   ~BerkeleySocket() = default;
   static int CreateServerSocket(unsigned server_ip_address,
                                 unsigned server_port);
+  static int CreateClientSocket(unsigned client_ip_address,
+                                unsigned client_port);
+  static int AcceptConnection(int client_listener_fd);
 
  private:
   BerkeleySocket() = delete;
@@ -22,6 +25,7 @@ class BerkeleySocket {
   void operator=(const BerkeleySocket &other) = delete;
   void operator=(const BerkeleySocket &&other) = delete;
 
+  static void SetReuseSockOpt(int socket_fd);
   static void SetNonblockFD(int fd);
   static struct sockaddr_in GetSockaddrIn(unsigned ip_address, unsigned port);
 

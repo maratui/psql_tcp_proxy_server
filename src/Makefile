@@ -19,4 +19,5 @@ googlestyle:
 	clang-format -style=Google -i $(FILES)
 
 cppcheck:
-	cppcheck --enable=all --suppress=missingIncludeSystem --language=c++ -UO_NONBLOCK $(FILES)
+	cppcheck --enable=all --suppress=missingIncludeSystem --language=c++ \
+	-UO_NONBLOCK -USO_REUSEPORT $(FILES)

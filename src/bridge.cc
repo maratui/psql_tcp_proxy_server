@@ -2,26 +2,17 @@
 
 using namespace psql_tcp;
 
+Bridge::Bridge(int socket_fd, int status, const std::string &filename)
+    : client_socket_(socket_fd), status_(status), filename_(filename) {
+  psql_socket_ =
+      BerkeleySocket::CreateClientSocket(INADDR_LOOPBACK, kPSQLPortNumber);
+}
+
 Bridge::~Bridge() {
   shutdown(client_socket_, SHUT_RDWR);
   shutdown(psql_socket_, SHUT_RDWR);
   close(client_socket_);
   close(psql_socket_);
-}
-
-Bridge::Bridge(int socket_fd, int status, const std::string &filename)
-    : client_socket_(socket_fd), status_(status), filename_(filename) {
-  struct sockaddr_in psql_sockaddr = utils::GetSockaddrIn(kPSQLPortNumber);
-
-  psql_socket_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-  utils::CheckResult(psql_socket_, "psql_socket");
-
-  function_result_ = connect(psql_socket_, (struct sockaddr *)&psql_sockaddr,
-                             sizeof(psql_sockaddr));
-  utils::CheckResult(function_result_, "connect");
-
-  function_result_ = utils::SetNonblockFD(psql_socket_);
-  utils::CheckResult(function_result_, "SetNonblockFD");
 }
 
 int Bridge::RecvRequest() {
