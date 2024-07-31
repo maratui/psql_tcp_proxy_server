@@ -4,7 +4,7 @@
 
 int main(int argc, char *argv[]) {
   if (argc == 3) {
-    psql_tcp::ProxyServer proxy_server = psql_tcp::ProxyServer(argv);
+    psql_tcp::ProxyServer proxy_server(argv);
 
     proxy_server.Run();
   } else {

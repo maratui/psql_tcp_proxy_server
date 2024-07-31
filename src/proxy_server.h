@@ -11,6 +11,7 @@
 #include <list>
 #include <sstream>
 
+#include "berkeley_socket.h"
 #include "bridge.h"
 #include "utils.h"
 

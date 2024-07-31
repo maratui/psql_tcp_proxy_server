@@ -4,32 +4,17 @@ using namespace psql_tcp;
 
 ProxyServer::ProxyServer(char *argv[]) : filename_(argv[2]) {
   std::istringstream str_iss(argv[1]);
-  int proxy_server_port{};
-  struct sockaddr_in proxy_server_sockaddr;
+  unsigned proxy_server_port{};
 
   str_iss >> proxy_server_port;
-  proxy_server_sockaddr = utils::GetSockaddrIn(proxy_server_port);
-
-  client_listener_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-  utils::CheckResult(client_listener_, "client_listener");
-
-  function_result_ =
-      bind(client_listener_, (struct sockaddr *)&proxy_server_sockaddr,
-           sizeof(proxy_server_sockaddr));
-  utils::CheckResult(function_result_, "bind");
-
-  function_result_ = utils::SetNonblockFD(client_listener_);
-  utils::CheckResult(function_result_, "SetNonblockFD");
-
-  function_result_ = listen(client_listener_, SOMAXCONN);
-  utils::CheckResult(function_result_, "listen");
+  client_listener_ =
+      BerkeleySocket::CreateServerSocket(INADDR_LOOPBACK, proxy_server_port);
 }
 
 ProxyServer::~ProxyServer() {
   for (auto bridges_iter = bridges_.begin(); bridges_iter != bridges_.end();
        ++bridges_iter) {
-    close((*bridges_iter)->GetClientSocket());
-    close((*bridges_iter)->GetServerSocket());
+    delete (*bridges_iter);
   }
 }
 
