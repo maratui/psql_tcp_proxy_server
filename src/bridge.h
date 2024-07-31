@@ -30,6 +30,8 @@ class Bridge {
   const static int kPSQLPortNumber = 5432;
   const static int kBufLen = 1024;
 
+  const std::string kLocalHost = "127.0.0.1";
+
   void SetQueryMessageLength();
 
   int client_socket_;

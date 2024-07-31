@@ -5,7 +5,7 @@ using namespace psql_tcp;
 Bridge::Bridge(int socket_fd, int status, const std::string &filename)
     : client_socket_(socket_fd), status_(status), filename_(filename) {
   psql_socket_ =
-      BerkeleySocket::CreateClientSocket(INADDR_LOOPBACK, kPSQLPortNumber);
+      BerkeleySocket::CreateClientSocket(kLocalHost, kPSQLPortNumber);
 }
 
 Bridge::~Bridge() {

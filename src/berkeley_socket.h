@@ -1,6 +1,7 @@
 #ifndef PSQL_TCP_PROXY_SERVER_BERKELEY_SOCKET_H_
 #define PSQL_TCP_PROXY_SERVER_BERKELEY_SOCKET_H_
 
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -14,11 +15,13 @@ class BerkeleySocket {
   ~BerkeleySocket() = default;
   static int CreateServerSocket(unsigned server_ip_address,
                                 unsigned server_port);
-  static int CreateClientSocket(unsigned client_ip_address,
+  static int CreateClientSocket(const std::string &client_ip_address,
                                 unsigned client_port);
   static int AcceptConnection(int client_listener_fd);
 
  private:
+  static const int kMaxConn = 10;
+
   BerkeleySocket() = delete;
   BerkeleySocket(const BerkeleySocket &other) = delete;
   BerkeleySocket(BerkeleySocket &&other) = delete;
@@ -27,6 +30,8 @@ class BerkeleySocket {
 
   static void SetReuseSockOpt(int socket_fd);
   static void SetNonblockFD(int fd);
+  static int SetSockaddrIn(struct sockaddr_in &sockaddr,
+                           const std::string &ip_address, unsigned port);
   static struct sockaddr_in GetSockaddrIn(unsigned ip_address, unsigned port);
 
   static void CheckResult(int result, const std::string &log_text);

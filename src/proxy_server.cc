@@ -70,7 +70,15 @@ void ProxyServer::AcceptConnection() {
   int client_socket{};
 
   client_socket = BerkeleySocket::AcceptConnection(client_listener_);
-  bridges_.push_back(new Bridge(client_socket, kRecvRequest, filename_));
+  if (client_socket > -1) {
+    Bridge *bridge = new Bridge(client_socket, kRecvRequest, filename_);
+
+    if (bridge->GetServerSocket() > -1) {
+      bridges_.push_back(bridge);
+    } else {
+      std::cout << "ошибка при создании моста" << std::endl;
+    }
+  }
 }
 
 void ProxyServer::ProcessConnections() {

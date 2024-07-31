@@ -54,37 +54,50 @@ int BerkeleySocket::CreateServerSocket(unsigned server_ip_address,
   return client_listener_fd;
 }
 
-int BerkeleySocket::CreateClientSocket(unsigned client_ip_address,
+int BerkeleySocket::CreateClientSocket(const std::string& client_ip_address,
                                        unsigned client_port) {
   struct sockaddr_in sockaddr {};
   int client_socket_fd{};
   int function_result{};
-  int connect_count{};
-  bool is_not_connect{};
 
   client_socket_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-  CheckResult(client_socket_fd, "ошибка при создании сокета для клиента");
-
-  SetReuseSockOpt(client_socket_fd);
-
-  sockaddr = GetSockaddrIn(client_ip_address, client_port);
+  if (client_socket_fd < 0) {
+    function_result = -1;
+    std::cout << "ошибка при создании сокета для клиента" << std::endl;
+  } else {
+    SetReuseSockOpt(client_socket_fd);
+    function_result = SetSockaddrIn(sockaddr, client_ip_address, client_port);
+    CheckResult(function_result, client_socket_fd, "Ошибка SetSockaddrIn");
+  }
 
   /*
     connect() - устанавливает соединение с сервером
+    загруженный сервер может отвергнуть попытку соединения, поэтому
+    предусматриваем повторные попытки соединения
   */
-  connect_count = 10;
-  do {
-    function_result = connect(client_socket_fd, (struct sockaddr*)&sockaddr,
-                              sizeof(sockaddr));
-    is_not_connect = (--connect_count > 0) && (function_result < 0);
-    if (is_not_connect) {
-      usleep(10);
-    }
-  } while (is_not_connect);
-  CheckResult(function_result, client_socket_fd,
-              "ошибка соединения с сервером");
+  if (function_result > -1) {
+    int connect_count{};
+    bool is_not_connect{};
 
-  SetNonblockFD(client_socket_fd);
+    connect_count = kMaxConn;
+    do {
+      function_result = connect(client_socket_fd, (struct sockaddr*)&sockaddr,
+                                sizeof(sockaddr));
+      is_not_connect = (--connect_count > 0) && (function_result < 0);
+      if (is_not_connect) {
+        usleep(10);
+      }
+    } while (is_not_connect);
+    if (function_result < 0) {
+      close(client_socket_fd);
+      client_socket_fd = -1;
+      std::cout << "ошибка соединения с сервером" << std::endl;
+    }
+  }
+
+  if (function_result > -1) {
+    SetNonblockFD(client_socket_fd);
+  }
 
   return client_socket_fd;
 }
@@ -164,6 +177,26 @@ struct sockaddr_in BerkeleySocket::GetSockaddrIn(unsigned ip_address,
   sockaddr.sin_addr.s_addr = htonl(ip_address);
 
   return sockaddr;
+}
+
+int BerkeleySocket::SetSockaddrIn(struct sockaddr_in& sockaddr,
+                                  const std::string& ip_address,
+                                  unsigned port) {
+  int result = 0;
+
+  if ((port < 1024) || (port > 65535)) {
+    result = -1;
+    std::cout << "ошибка: не корректный порт" << std::endl;
+  } else {
+    sockaddr.sin_family = AF_INET;
+    sockaddr.sin_port = htons(port);
+    if (inet_pton(AF_INET, ip_address.c_str(), &sockaddr.sin_addr) == 0) {
+      result = -1;
+      std::cout << "ошибка: не корректный IP-адрес" << std::endl;
+    }
+  }
+
+  return result;
 }
 
 void BerkeleySocket::CheckResult(int result, const std::string& log_text) {
