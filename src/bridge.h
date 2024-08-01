@@ -37,7 +37,7 @@ class Bridge {
   void operator=(const Bridge &&other) = delete;
 
   static void WriteLog(const std::string &log_text);
-  void SetQueryMessageLength();
+  void SetMessageLength();
 
   int client_socket_{};
   int psql_socket_{};
@@ -48,12 +48,10 @@ class Bridge {
   long write_bytes_{};
 
   std::string client_request_ = "";
-  long client_message_length_ = 0L;
-  long sent_request_length_ = 0L;
-
   std::string psql_response_ = "";
-
-  long unsigned query_message_length_ = 0LU;
+  long unsigned client_message_length_ = 0LU;
+  long unsigned sent_request_length_ = 0LU;
+  long unsigned message_length_ = 0LU;
 };
 }  // namespace psql_tcp
 

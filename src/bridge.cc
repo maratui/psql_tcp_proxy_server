@@ -24,41 +24,33 @@ void Bridge::SetFilename(const std::string& filename) noexcept {
 }
 
 int Bridge::RecvRequest() {
-std::cout << "RecvRequest\n";
-  while (true) {
-    if ((read_bytes_ = recv(client_socket_, buf_, kBufLen, MSG_NOSIGNAL)) >
-        0) {
+  /*
+    Получим все входящие данные на этот сокет прежде чем вернемся и снова
+    вызовем select
+  */
+  do {
+    read_bytes_ = recv(client_socket_, buf_, kBufLen, MSG_NOSIGNAL);
+    if (read_bytes_ > 0) {
       client_request_.append(buf_, read_bytes_);
-
-      if ((query_message_length_ == 0) && (buf_[0] == 'Q')) {
-        SetQueryMessageLength();
-      }
-
-      if ((client_request_.size() < kBufLen) ||
-          ((client_request_[0] == 'Q') &&
-           (client_request_.size() == query_message_length_))) {
-        client_message_length_ = client_request_.size();
-
-        if ((client_message_length_ > 0) && (client_request_[0] == 'Q')) {
-          query_message_length_ = 0;
-          WriteLog(client_request_.substr(5, client_request_.size() - 6));
-        }
-
+      if (read_bytes_ < kBufLen) {
+        message_length_ = client_request_.size();
         read_bytes_ = 0;
+      } else if (message_length_ == 0) {
+        SetMessageLength();
       }
-std::string str;
-str.append(buf_, read_bytes_);
-std::cout << "recv: " << str << "\n";
-    } else if ((read_bytes_ == 0) && (errno == EAGAIN)) {
-      read_bytes_ = 1;
-std::cout << errno << ": " <<  EAGAIN << "\n";
-      break;
-    } else {
-std::cout << "break\n";
-char a;
-std::cin >> a;
+      client_message_length_ = message_length_;
+    }
+  } while (read_bytes_ > 0);
+
+  if (errno == EWOULDBLOCK) {
+    if (client_request_.size() == message_length_) {
+      if ((client_request_.size() > 0) && (client_request_[0] == 'Q')) {
+        WriteLog(client_request_.substr(5, client_message_length_ - 6));
+      }
+      message_length_ = 0;
       read_bytes_ = 0;
-      break;
+    } else {
+      read_bytes_ = 1;
     }
   }
 
@@ -77,18 +69,22 @@ int Bridge::RecvResponse() {
 }
 
 int Bridge::SendRequest() {
-  if ((write_bytes_ =
-           send(psql_socket_, client_request_.c_str() + sent_request_length_,
-                client_message_length_, MSG_NOSIGNAL)) > 0) {
-    sent_request_length_ += write_bytes_;
-    client_message_length_ -= write_bytes_;
-
+  do {
+    write_bytes_ =
+        send(psql_socket_, client_request_.c_str() + sent_request_length_,
+             client_message_length_, MSG_NOSIGNAL);
+    if (write_bytes_ > 0) {
+      sent_request_length_ += write_bytes_;
+      client_message_length_ -= write_bytes_;
+    }
     if (client_message_length_ == 0) {
       sent_request_length_ = 0;
       client_request_.clear();
       write_bytes_ = 0;
     }
-  } else if ((write_bytes_ == 0) && (errno == EAGAIN)) {
+  } while (write_bytes_ > 0);
+
+  if (client_message_length_ > 0) {
     write_bytes_ = 1;
   }
 
@@ -115,9 +111,9 @@ int Bridge::GetStatus() const noexcept { return status_; }
 
 void Bridge::SetStatus(int status) noexcept { status_ = status; }
 
-void Bridge::SetQueryMessageLength() {
-  if ((client_request_.length() >= 5) && (client_request_[0] == 'Q')) {
-    query_message_length_ =
+void Bridge::SetMessageLength() {
+  if (client_request_.length() >= 5) {
+    message_length_ =
         (long unsigned)((unsigned char)(client_request_[1]) << 24 |
                         (unsigned char)(client_request_[2]) << 16 |
                         (unsigned char)(client_request_[3]) << 8 |
