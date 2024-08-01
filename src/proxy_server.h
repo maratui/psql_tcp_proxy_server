@@ -27,6 +27,8 @@ class ProxyServer {
  private:
   enum { kRecvRequest, kSendRequest, kRecvResponse, kSendResponse };
 
+  const std::string kLocalHost = "127.0.0.1";
+
   void SetFDSet();
   void AcceptConnection();
   void ProcessConnections();

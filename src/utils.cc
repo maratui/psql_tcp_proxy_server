@@ -1,15 +1,5 @@
 #include "utils.h"
 
-struct sockaddr_in utils::GetSockaddrIn(int port_number) {
-  struct sockaddr_in sockaddr;
-
-  sockaddr.sin_family = AF_INET;
-  sockaddr.sin_port = htons(port_number);
-  sockaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-
-  return sockaddr;
-}
-
 int utils::SetNonblockFD(int fd) {
   int flags{};
   int result{};
@@ -48,12 +38,22 @@ void utils::CheckResult(int result, const std::string& log_text) {
   }
 }
 
+void utils::Log(const std::string& log_text) {
+  if (errno) {
+    std::cerr << log_text << ": " << std::strerror(errno) << std::endl;
+  } else {
+    std::cerr << log_text << std::endl;
+  }
+}
+
 void utils::ExitWithLog(const std::string& log_text) {
   if (errno) {
     std::cerr << log_text << ": " << std::strerror(errno) << std::endl;
+    std::cout << "Завершение работы приложения" << std::endl;
     exit(errno);
   } else {
     std::cerr << log_text << std::endl;
+    std::cout << "Завершение работы приложения" << std::endl;
     exit(EXIT_FAILURE);
   }
 }

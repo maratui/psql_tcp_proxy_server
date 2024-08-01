@@ -8,10 +8,15 @@ ProxyServer::ProxyServer(char *argv[]) : filename_(argv[2]) {
 
   str_iss >> proxy_server_port;
   client_listener_ =
-      BerkeleySocket::CreateServerSocket(INADDR_LOOPBACK, proxy_server_port);
+      BerkeleySocket::CreateServerSocket(kLocalHost, proxy_server_port);
+  utils::CheckResult(client_listener_, "Ошибка создания сокета прокси-сервера");
 }
 
 ProxyServer::~ProxyServer() {
+  if (client_listener_ > -1) {
+    shutdown(client_listener_, SHUT_RDWR);
+    close(client_listener_);
+  }
   for (auto bridges_iter = bridges_.begin(); bridges_iter != bridges_.end();
        ++bridges_iter) {
     delete (*bridges_iter);
@@ -69,14 +74,15 @@ void ProxyServer::SetFDSet() {
 void ProxyServer::AcceptConnection() {
   int client_socket{};
 
-  client_socket = BerkeleySocket::AcceptConnection(client_listener_);
+  client_socket = BerkeleySocket::Accept(client_listener_);
   if (client_socket > -1) {
     Bridge *bridge = new Bridge(client_socket, kRecvRequest, filename_);
 
     if (bridge->GetServerSocket() > -1) {
       bridges_.push_back(bridge);
     } else {
-      std::cout << "ошибка при создании моста" << std::endl;
+      delete (bridge);
+      std::cout << "Ошибка при создании моста" << std::endl;
     }
   }
 }

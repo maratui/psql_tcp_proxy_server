@@ -9,10 +9,14 @@ Bridge::Bridge(int socket_fd, int status, const std::string &filename)
 }
 
 Bridge::~Bridge() {
-  shutdown(client_socket_, SHUT_RDWR);
-  shutdown(psql_socket_, SHUT_RDWR);
-  close(client_socket_);
-  close(psql_socket_);
+  if (client_socket_ > -1) {
+    shutdown(client_socket_, SHUT_RDWR);
+    close(client_socket_);
+  }
+  if (psql_socket_ > -1) {
+    shutdown(psql_socket_, SHUT_RDWR);
+    close(psql_socket_);
+  }
 }
 
 int Bridge::RecvRequest() {
