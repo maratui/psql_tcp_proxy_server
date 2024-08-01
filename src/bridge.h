@@ -1,19 +1,15 @@
 #ifndef PSQL_TCP_PROXY_SERVER_BRIDGE_H_
 #define PSQL_TCP_PROXY_SERVER_BRIDGE_H_
 
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
+#include <fstream>
 
 #include "berkeley_socket.h"
-#include "utils.h"
 
 namespace psql_tcp {
 class Bridge {
  public:
   Bridge() = delete;
-  explicit Bridge(int socket_fd, int status, const std::string &filename);
+  explicit Bridge(int socket_fd, int status, const std::string& filename);
   ~Bridge();
 
   int RecvRequest();
@@ -33,6 +29,7 @@ class Bridge {
   const std::string kLocalHost = "127.0.0.1";
 
   void SetQueryMessageLength();
+  void WriteLog(const std::string& filename, const std::string& log_text);
 
   int client_socket_;
   int status_;

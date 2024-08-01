@@ -2,7 +2,7 @@
 
 using namespace psql_tcp;
 
-Bridge::Bridge(int socket_fd, int status, const std::string &filename)
+Bridge::Bridge(int socket_fd, int status, const std::string& filename)
     : client_socket_(socket_fd), status_(status), filename_(filename) {
   psql_socket_ =
       BerkeleySocket::CreateClientSocket(kLocalHost, kPSQLPortNumber);
@@ -34,8 +34,8 @@ int Bridge::RecvRequest() {
 
       if ((client_message_length_ > 0) && (client_request_[0] == 'Q')) {
         query_message_length_ = 0;
-        utils::WriteLog(filename_,
-                        client_request_.substr(5, client_request_.size() - 6));
+        WriteLog(filename_,
+                 client_request_.substr(5, client_request_.size() - 6));
       }
 
       read_bytes_ = 0;
@@ -105,5 +105,17 @@ void Bridge::SetQueryMessageLength() {
                         (unsigned char)(client_request_[3]) << 8 |
                         (unsigned char)(client_request_[4])) +
         1LU;
+  }
+}
+
+void Bridge::WriteLog(const std::string& filename,
+                      const std::string& log_text) {
+  std::ofstream out(filename.c_str(), std::ios::app);
+
+  if (out.is_open()) {
+    out << std::endl << log_text << std::endl;
+    out.close();
+  } else {
+    std::cerr << "Ошибка открытия лог файла" << std::endl;
   }
 }

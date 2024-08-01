@@ -2,12 +2,13 @@
 #define PSQL_TCP_PROXY_SERVER_BERKELEY_SOCKET_H_
 
 #include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/types.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
 
-#include "utils.h"
+#include <cstring>
+#include <iostream>
+#include <string>
 
 namespace psql_tcp {
 class BerkeleySocket {

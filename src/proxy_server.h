@@ -1,19 +1,12 @@
 #ifndef PSQL_TCP_PROXY_SERVER_PROXY_SERVER_H_
 #define PSQL_TCP_PROXY_SERVER_PROXY_SERVER_H_
 
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
-
 #include <algorithm>
 #include <list>
 #include <sstream>
 
 #include "berkeley_socket.h"
 #include "bridge.h"
-#include "utils.h"
 
 namespace psql_tcp {
 class ProxyServer {
@@ -32,6 +25,7 @@ class ProxyServer {
   void SetFDSet();
   void AcceptConnection();
   void ProcessConnections();
+  void CheckResult(int result, const std::string &log_text);
 
   std::string filename_ = "";
 
@@ -43,7 +37,7 @@ class ProxyServer {
 
   std::list<Bridge *> bridges_;
 
-  int function_result_{};
+  int result_{};
 };
 }  // namespace psql_tcp
 

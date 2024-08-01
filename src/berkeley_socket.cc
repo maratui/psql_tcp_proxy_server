@@ -219,6 +219,10 @@ void BerkeleySocket::CheckResult(int result, int &socket_fd,
   if (result < 0) {
     close(socket_fd);
     socket_fd = -1;
-    utils::Log(log_text);
+    if (errno) {
+      std::cerr << log_text << ": " << std::strerror(errno) << std::endl;
+    } else {
+      std::cerr << log_text << std::endl;
+    }
   }
 }

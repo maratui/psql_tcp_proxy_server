@@ -9,7 +9,7 @@ ProxyServer::ProxyServer(char *argv[]) : filename_(argv[2]) {
   str_iss >> proxy_server_port;
   client_listener_ =
       BerkeleySocket::CreateServerSocket(kLocalHost, proxy_server_port);
-  utils::CheckResult(client_listener_, "Ошибка создания сокета прокси-сервера");
+  CheckResult(client_listener_, "Ошибка создания сокета прокси-сервера");
 }
 
 ProxyServer::~ProxyServer() {
@@ -29,9 +29,15 @@ void ProxyServer::Run() {
     FD_ZERO(&write_fd_set_);
     SetFDSet();
 
-    function_result_ =
+    /*
+      select() - позволяяет приложениям мультиплексировать свои операции
+      ввода-вывода
+    */
+    result_ =
         select(sockets_max_ + 1, &read_fd_set_, &write_fd_set_, NULL, NULL);
-    utils::CheckResult(function_result_, "select");
+    if (result_ < 0) {
+      std::cerr << "Ошибка select" << std::endl;
+    }
 
     if (FD_ISSET(client_listener_, &read_fd_set_)) {
       AcceptConnection();
@@ -116,9 +122,17 @@ void ProxyServer::ProcessConnections() {
     if (result < 0) {
       delete (*bridges_iter);
       bridges_iter = bridges_.erase(bridges_iter);
-      utils::OutMessage("connection closed");
+      std::cout << "connection closed" << std::endl;
     } else {
       ++bridges_iter;
     }
+  }
+}
+
+void ProxyServer::CheckResult(int result, const std::string &log_text) {
+  if (result < 0) {
+    std::cerr << log_text << std::endl;
+    std::cout << "Завершение работы приложения" << std::endl;
+    exit(EXIT_FAILURE);
   }
 }
