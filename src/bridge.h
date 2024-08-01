@@ -8,9 +8,10 @@
 namespace psql_tcp {
 class Bridge {
  public:
-  Bridge() = delete;
-  explicit Bridge(int socket_fd, int status, const std::string& filename);
+  explicit Bridge(int socket_fd, int status);
   ~Bridge();
+
+  static void SetFilename(const std::string &filename) noexcept;
 
   int RecvRequest();
   int RecvResponse();
@@ -25,17 +26,22 @@ class Bridge {
  private:
   const static int kPSQLPortNumber = 5432;
   const static int kBufLen = 1024;
+  const static inline std::string kLocalHost = "127.0.0.1";
 
-  const std::string kLocalHost = "127.0.0.1";
+  static inline std::string filename_ = "";
 
+  Bridge() = delete;
+  Bridge(const Bridge &other) = delete;
+  Bridge(Bridge &&other) = delete;
+  void operator=(const Bridge &other) = delete;
+  void operator=(const Bridge &&other) = delete;
+
+  static void WriteLog(const std::string &log_text);
   void SetQueryMessageLength();
-  void WriteLog(const std::string& filename, const std::string& log_text);
 
-  int client_socket_;
-  int status_;
-  std::string filename_;
-
+  int client_socket_{};
   int psql_socket_{};
+  int status_{};
 
   char buf_[kBufLen]{};
   int read_bytes_{};
@@ -48,8 +54,6 @@ class Bridge {
   std::string psql_response_ = "";
 
   long unsigned query_message_length_ = 0LU;
-
-  int function_result_{};
 };
 }  // namespace psql_tcp
 

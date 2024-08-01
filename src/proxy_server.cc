@@ -2,7 +2,7 @@
 
 using namespace psql_tcp;
 
-ProxyServer::ProxyServer(char *argv[]) : filename_(argv[2]) {
+ProxyServer::ProxyServer(char *argv[]) {
   std::istringstream str_iss(argv[1]);
   unsigned proxy_server_port{};
 
@@ -10,6 +10,8 @@ ProxyServer::ProxyServer(char *argv[]) : filename_(argv[2]) {
   client_listener_ =
       BerkeleySocket::CreateServerSocket(kLocalHost, proxy_server_port);
   CheckResult(client_listener_, "Ошибка создания сокета прокси-сервера");
+
+  Bridge::SetFilename(argv[2]);
 }
 
 ProxyServer::~ProxyServer() {
@@ -48,9 +50,7 @@ void ProxyServer::Run() {
 }
 
 void ProxyServer::SetFDSet() {
-  std::list<int> sockets;
-
-  sockets.push_back(client_listener_);
+  sockets_max_ = client_listener_;
   FD_SET(client_listener_, &read_fd_set_);
 
   for (auto bridges_iter = bridges_.begin(); bridges_iter != bridges_.end();
@@ -71,10 +71,10 @@ void ProxyServer::SetFDSet() {
       socket_fd = (*bridges_iter)->GetServerSocket();
       FD_SET(socket_fd, &write_fd_set_);
     }
-    sockets.push_back(socket_fd);
+    if (socket_fd > sockets_max_) {
+      sockets_max_ = socket_fd;
+    }
   }
-
-  sockets_max_ = *std::max_element(sockets.begin(), sockets.end());
 }
 
 void ProxyServer::AcceptConnection() {
@@ -82,7 +82,7 @@ void ProxyServer::AcceptConnection() {
 
   client_socket = BerkeleySocket::Accept(client_listener_);
   if (client_socket > -1) {
-    Bridge *bridge = new Bridge(client_socket, kRecvRequest, filename_);
+    Bridge *bridge = new Bridge(client_socket, kRecvRequest);
 
     if (bridge->GetServerSocket() > -1) {
       bridges_.push_back(bridge);

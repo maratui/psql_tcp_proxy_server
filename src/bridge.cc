@@ -2,8 +2,8 @@
 
 using namespace psql_tcp;
 
-Bridge::Bridge(int socket_fd, int status, const std::string& filename)
-    : client_socket_(socket_fd), status_(status), filename_(filename) {
+Bridge::Bridge(int socket_fd, int status)
+    : client_socket_(socket_fd), status_(status) {
   psql_socket_ =
       BerkeleySocket::CreateClientSocket(kLocalHost, kPSQLPortNumber);
 }
@@ -17,6 +17,10 @@ Bridge::~Bridge() {
     shutdown(psql_socket_, SHUT_RDWR);
     close(psql_socket_);
   }
+}
+
+void Bridge::SetFilename(const std::string& filename) noexcept {
+  filename_ = filename;
 }
 
 int Bridge::RecvRequest() {
@@ -34,8 +38,7 @@ int Bridge::RecvRequest() {
 
       if ((client_message_length_ > 0) && (client_request_[0] == 'Q')) {
         query_message_length_ = 0;
-        WriteLog(filename_,
-                 client_request_.substr(5, client_request_.size() - 6));
+        WriteLog(client_request_.substr(5, client_request_.size() - 6));
       }
 
       read_bytes_ = 0;
@@ -108,9 +111,8 @@ void Bridge::SetQueryMessageLength() {
   }
 }
 
-void Bridge::WriteLog(const std::string& filename,
-                      const std::string& log_text) {
-  std::ofstream out(filename.c_str(), std::ios::app);
+void Bridge::WriteLog(const std::string& log_text) {
+  std::ofstream out(filename_.c_str(), std::ios::app);
 
   if (out.is_open()) {
     out << std::endl << log_text << std::endl;

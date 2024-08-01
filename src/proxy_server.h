@@ -1,7 +1,6 @@
 #ifndef PSQL_TCP_PROXY_SERVER_PROXY_SERVER_H_
 #define PSQL_TCP_PROXY_SERVER_PROXY_SERVER_H_
 
-#include <algorithm>
 #include <list>
 #include <sstream>
 
@@ -11,23 +10,25 @@
 namespace psql_tcp {
 class ProxyServer {
  public:
-  ProxyServer() = delete;
   explicit ProxyServer(char *argv[]);
   ~ProxyServer();
 
   void Run();
 
  private:
+  const static inline std::string kLocalHost = "127.0.0.1";
   enum { kRecvRequest, kSendRequest, kRecvResponse, kSendResponse };
 
-  const std::string kLocalHost = "127.0.0.1";
+  ProxyServer() = delete;
+  ProxyServer(const ProxyServer &other) = delete;
+  ProxyServer(ProxyServer &&other) = delete;
+  void operator=(const ProxyServer &other) = delete;
+  void operator=(const ProxyServer &&other) = delete;
 
   void SetFDSet();
   void AcceptConnection();
   void ProcessConnections();
   void CheckResult(int result, const std::string &log_text);
-
-  std::string filename_ = "";
 
   int client_listener_{};
 
