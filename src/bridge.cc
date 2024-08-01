@@ -24,27 +24,42 @@ void Bridge::SetFilename(const std::string& filename) noexcept {
 }
 
 int Bridge::RecvRequest() {
-  if ((read_bytes_ = recv(client_socket_, buf_, kBufLen, MSG_NOSIGNAL)) > 0) {
-    client_request_.append(buf_, read_bytes_);
+std::cout << "RecvRequest\n";
+  while (true) {
+    if ((read_bytes_ = recv(client_socket_, buf_, kBufLen, MSG_NOSIGNAL)) >
+        0) {
+      client_request_.append(buf_, read_bytes_);
 
-    if ((query_message_length_ == 0) && (buf_[0] == 'Q')) {
-      SetQueryMessageLength();
-    }
-
-    if ((client_request_.size() < kBufLen) ||
-        ((client_request_[0] == 'Q') &&
-         (client_request_.size() == query_message_length_))) {
-      client_message_length_ = client_request_.size();
-
-      if ((client_message_length_ > 0) && (client_request_[0] == 'Q')) {
-        query_message_length_ = 0;
-        WriteLog(client_request_.substr(5, client_request_.size() - 6));
+      if ((query_message_length_ == 0) && (buf_[0] == 'Q')) {
+        SetQueryMessageLength();
       }
 
+      if ((client_request_.size() < kBufLen) ||
+          ((client_request_[0] == 'Q') &&
+           (client_request_.size() == query_message_length_))) {
+        client_message_length_ = client_request_.size();
+
+        if ((client_message_length_ > 0) && (client_request_[0] == 'Q')) {
+          query_message_length_ = 0;
+          WriteLog(client_request_.substr(5, client_request_.size() - 6));
+        }
+
+        read_bytes_ = 0;
+      }
+std::string str;
+str.append(buf_, read_bytes_);
+std::cout << "recv: " << str << "\n";
+    } else if ((read_bytes_ == 0) && (errno == EAGAIN)) {
+      read_bytes_ = 1;
+std::cout << errno << ": " <<  EAGAIN << "\n";
+      break;
+    } else {
+std::cout << "break\n";
+char a;
+std::cin >> a;
       read_bytes_ = 0;
+      break;
     }
-  } else if ((read_bytes_ == 0) && (errno == EAGAIN)) {
-    read_bytes_ = 1;
   }
 
   return read_bytes_;
