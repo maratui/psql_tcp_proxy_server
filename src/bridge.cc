@@ -6,6 +6,16 @@ Bridge::Bridge(int socket_fd, int status)
     : client_socket_(socket_fd), status_(status) {
   psql_socket_ =
       BerkeleySocket::CreateClientSocket(kLocalHost, kPSQLPortNumber);
+
+  if (psql_socket_ > -1) {
+    client_request_.string = "";
+    client_request_.sent_length = 0;
+    client_request_.length = 0;
+
+    psql_response_.string = "";
+    psql_response_.sent_length = 0;
+    psql_response_.length = 0;
+  }
 }
 
 Bridge::~Bridge() {
@@ -19,89 +29,29 @@ Bridge::~Bridge() {
   }
 }
 
-void Bridge::SetFilename(const std::string& filename) noexcept {
+void Bridge::SetFilename(const std::string &filename) noexcept {
   filename_ = filename;
 }
 
 int Bridge::RecvRequest() {
-  /*
-    Получим все входящие данные на этот сокет прежде чем вернемся и снова
-    вызовем select
-  */
-  do {
-    read_bytes_ = recv(client_socket_, buf_, kBufLen, MSG_NOSIGNAL);
-    if (read_bytes_ > 0) {
-      client_request_.append(buf_, read_bytes_);
-      if (read_bytes_ < kBufLen) {
-        message_length_ = client_request_.size();
-        read_bytes_ = 0;
-      } else if (message_length_ == 0) {
-        SetMessageLength();
-      }
-      client_message_length_ = message_length_;
-    }
-  } while (read_bytes_ > 0);
+  int result{};
 
-  if (errno == EWOULDBLOCK) {
-    if (client_request_.size() == message_length_) {
-      if ((client_request_.size() > 0) && (client_request_[0] == 'Q')) {
-        WriteLog(client_request_.substr(5, client_message_length_ - 6));
-      }
-      message_length_ = 0;
-      read_bytes_ = 0;
-    } else {
-      read_bytes_ = 1;
+  result = Recv(client_socket_, client_request_);
+  if ((result == 0) && (errno == EWOULDBLOCK)) {
+    if ((client_request_.length > 5) && (client_request_.string[0] == 'Q')) {
+      WriteQueryToLog(
+          client_request_.string.substr(5, client_request_.length - 6));
     }
   }
 
-  return read_bytes_;
+  return result;
 }
 
-int Bridge::RecvResponse() {
-  if ((read_bytes_ = recv(psql_socket_, buf_, kBufLen, MSG_NOSIGNAL)) > 0) {
-    psql_response_.append(buf_, read_bytes_);
-    read_bytes_ = 0;
-  } else if ((read_bytes_ == 0) && (errno == EAGAIN)) {
-    read_bytes_ = 1;
-  }
+int Bridge::RecvResponse() { return Recv(psql_socket_, psql_response_); }
 
-  return read_bytes_;
-}
+int Bridge::SendRequest() { return Send(psql_socket_, client_request_); }
 
-int Bridge::SendRequest() {
-  do {
-    write_bytes_ =
-        send(psql_socket_, client_request_.c_str() + sent_request_length_,
-             client_message_length_, MSG_NOSIGNAL);
-    if (write_bytes_ > 0) {
-      sent_request_length_ += write_bytes_;
-      client_message_length_ -= write_bytes_;
-    }
-    if (client_message_length_ == 0) {
-      sent_request_length_ = 0;
-      client_request_.clear();
-      write_bytes_ = 0;
-    }
-  } while (write_bytes_ > 0);
-
-  if (client_message_length_ > 0) {
-    write_bytes_ = 1;
-  }
-
-  return write_bytes_;
-}
-
-int Bridge::SendResponse() {
-  if ((write_bytes_ = send(client_socket_, psql_response_.c_str(),
-                           psql_response_.size(), MSG_NOSIGNAL)) > 0) {
-    psql_response_.clear();
-    write_bytes_ = 0;
-  } else if ((write_bytes_ == 0) && (errno == EAGAIN)) {
-    write_bytes_ = 1;
-  }
-
-  return write_bytes_;
-}
+int Bridge::SendResponse() { return Send(client_socket_, psql_response_); }
 
 int Bridge::GetClientSocket() const noexcept { return client_socket_; }
 
@@ -111,24 +61,87 @@ int Bridge::GetStatus() const noexcept { return status_; }
 
 void Bridge::SetStatus(int status) noexcept { status_ = status; }
 
-void Bridge::SetMessageLength() {
-  if (client_request_.length() >= 5) {
-    message_length_ =
-        (long unsigned)((unsigned char)(client_request_[1]) << 24 |
-                        (unsigned char)(client_request_[2]) << 16 |
-                        (unsigned char)(client_request_[3]) << 8 |
-                        (unsigned char)(client_request_[4])) +
-        1LU;
-  }
-}
-
-void Bridge::WriteLog(const std::string& log_text) {
+void Bridge::WriteQueryToLog(const std::string &query) {
   std::ofstream out(filename_.c_str(), std::ios::app);
 
   if (out.is_open()) {
-    out << std::endl << log_text << std::endl;
+    out << std::endl << query << std::endl;
     out.close();
   } else {
     std::cerr << "Ошибка открытия лог файла" << std::endl;
   }
+}
+
+int Bridge::Recv(int socket_fd, struct message_s &message) {
+  /*
+    Получим все входящие данные на этот сокет прежде чем вернемся и снова
+    вызовем select
+  */
+  do {
+    read_bytes_ = recv(socket_fd, buf_, kBufLen, MSG_NOSIGNAL);
+    if (read_bytes_ > 0) {
+      message.string.append(buf_, read_bytes_);
+
+      if (message.length == 0) {
+        if (read_bytes_ < kBufLen) {
+          message.length = read_bytes_;
+        } else {
+          message.length = GetMessageLength(message.string);
+        }
+      }
+    }
+  } while (read_bytes_ > 0);
+
+  /*
+    Получаем данные по этому соединению до тех пор,
+    пока не установится EWOULDBLOCK или EAGAIN.
+    Если будут другие ошибки, то произошел сбой и мы закроем связь.
+  */
+  if (errno == EWOULDBLOCK) {
+    if (message.string.length() == message.length) {
+      read_bytes_ = 0;
+    } else {
+      read_bytes_ = 1;
+    }
+  } else if (errno == EAGAIN) {
+    read_bytes_ = 1;
+  }
+
+  return read_bytes_;
+}
+
+int Bridge::Send(int socket_fd, struct message_s &message) {
+  do {
+    write_bytes_ = send(socket_fd, message.string.c_str() + message.sent_length,
+                        message.length, MSG_NOSIGNAL);
+    if (write_bytes_ > 0) {
+      message.sent_length += write_bytes_;
+      message.length -= write_bytes_;
+    }
+    if (message.length == 0) {
+      message.string.clear();
+      message.sent_length = 0;
+      write_bytes_ = 0;
+    }
+  } while (write_bytes_ > 0);
+
+  if ((write_bytes_ == 0) && (message.length > 0)) {
+    write_bytes_ = 1;
+  }
+
+  return write_bytes_;
+}
+
+long unsigned Bridge::GetMessageLength(const std::string &message) {
+  long unsigned message_length = 0LU;
+
+  if (message.length() >= 5) {
+    message_length = (long unsigned)((unsigned char)(message[1]) << 24 |
+                                     (unsigned char)(message[2]) << 16 |
+                                     (unsigned char)(message[3]) << 8 |
+                                     (unsigned char)(message[4])) +
+                     1LU;
+  }
+
+  return message_length;
 }

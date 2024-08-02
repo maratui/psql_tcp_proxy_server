@@ -24,11 +24,15 @@ class Bridge {
   void SetStatus(int status) noexcept;
 
  private:
-  const static int kPSQLPortNumber = 5432;
-  const static int kBufLen = 1024;
-  const static inline std::string kLocalHost = "127.0.0.1";
+  struct message_s {
+    std::string string;
+    size_t sent_length;
+    size_t length;
+  };
 
-  static inline std::string filename_ = "";
+  static const inline std::string kLocalHost = "127.0.0.1";
+  static const int kPSQLPortNumber = 5432;
+  static const int kBufLen = 1024;
 
   Bridge() = delete;
   Bridge(const Bridge &other) = delete;
@@ -36,22 +40,24 @@ class Bridge {
   void operator=(const Bridge &other) = delete;
   void operator=(const Bridge &&other) = delete;
 
-  static void WriteLog(const std::string &log_text);
-  void SetMessageLength();
+  static void WriteQueryToLog(const std::string &query);
+
+  int Recv(int socket_fd, struct message_s &message);
+  int Send(int socket_fd, struct message_s &message);
+  long unsigned GetMessageLength(const std::string &message);
+
+  static inline std::string filename_ = "";
+
+  struct message_s client_request_;
+  struct message_s psql_response_;
 
   int client_socket_{};
   int psql_socket_{};
   int status_{};
 
   char buf_[kBufLen]{};
-  int read_bytes_{};
-  long write_bytes_{};
-
-  std::string client_request_ = "";
-  std::string psql_response_ = "";
-  long unsigned client_message_length_ = 0LU;
-  long unsigned sent_request_length_ = 0LU;
-  long unsigned message_length_ = 0LU;
+  ssize_t read_bytes_{};
+  ssize_t write_bytes_{};
 };
 }  // namespace psql_tcp
 
