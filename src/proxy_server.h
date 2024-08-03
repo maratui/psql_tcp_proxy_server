@@ -31,10 +31,12 @@ class ProxyServer {
   void CheckResult(int result, const std::string &log_text);
 
   int client_listener_{};
+  int new_socket_{};
+  int sockets_ready_{};
 
   fd_set read_fd_set_;
   fd_set write_fd_set_;
-  int sockets_max_{};
+  int max_socket_{};
 
   std::list<Bridge *> bridges_;
 

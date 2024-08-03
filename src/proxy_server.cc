@@ -26,7 +26,11 @@ ProxyServer::~ProxyServer() {
 }
 
 void ProxyServer::Run() {
-  while (true) {
+  /*
+    Циклическое ожидание входящих соединений или входящих данных
+    на любом из подключенных сокетов.
+  */
+  do {
     FD_ZERO(&read_fd_set_);
     FD_ZERO(&write_fd_set_);
     SetFDSet();
@@ -35,22 +39,29 @@ void ProxyServer::Run() {
       select() - позволяяет приложениям мультиплексировать свои операции
       ввода-вывода
     */
+    std::cout << "Ожидание select() ..." << std::endl;
+    // std::cin >> result_;
     result_ =
-        select(sockets_max_ + 1, &read_fd_set_, &write_fd_set_, NULL, NULL);
-    if (result_ < 0) {
-      std::cerr << "Ошибка select" << std::endl;
-    }
+        select(max_socket_ + 1, &read_fd_set_, &write_fd_set_, NULL, NULL);
+    CheckResult(result_, "Ошибка select()");
 
-    if (FD_ISSET(client_listener_, &read_fd_set_)) {
-      AcceptConnection();
+    if (result_ > 0) {
+      sockets_ready_ = result_;
+      std::cout << sockets_ready_ << " сокетов готовы к обработке "
+                << std::endl;
+      if (FD_ISSET(client_listener_, &read_fd_set_)) {
+        AcceptConnection();
+      }
+      ProcessConnections();
+    } else if (result_ == 0) {
+      std::cout << "select() завершился с результатом 0." << std::endl;
+      std::cout << "Завершение работы приложения" << std::endl;
     }
-
-    ProcessConnections();
-  }
+  } while (result_ > 0);
 }
 
 void ProxyServer::SetFDSet() {
-  sockets_max_ = client_listener_;
+  max_socket_ = client_listener_;
   FD_SET(client_listener_, &read_fd_set_);
 
   for (auto bridges_iter = bridges_.begin(); bridges_iter != bridges_.end();
@@ -71,58 +82,87 @@ void ProxyServer::SetFDSet() {
       socket_fd = (*bridges_iter)->GetServerSocket();
       FD_SET(socket_fd, &write_fd_set_);
     }
-    if (socket_fd > sockets_max_) {
-      sockets_max_ = socket_fd;
+    if (socket_fd > max_socket_) {
+      max_socket_ = socket_fd;
     }
   }
 }
 
 void ProxyServer::AcceptConnection() {
-  int client_socket{};
+  std::cout << "Прослушиваемый сокет " << client_listener_
+            << " доступен для чтения" << std::endl;
+  do {
+    new_socket_ = BerkeleySocket::Accept(client_listener_);
 
-  client_socket = BerkeleySocket::Accept(client_listener_);
-  if (client_socket > -1) {
-    Bridge *bridge = new Bridge(client_socket, kRecvRequest);
+    if (new_socket_ > -1) {
+      Bridge *bridge = new Bridge(new_socket_, kRecvRequest);
 
-    if (bridge->GetServerSocket() > -1) {
-      bridges_.push_back(bridge);
-    } else {
-      delete (bridge);
-      std::cout << "Ошибка при создании моста" << std::endl;
+      std::cout << "Новое входящее соединение - " << new_socket_ << std::endl;
+      if (bridge->GetServerSocket() > -1) {
+        bridges_.push_back(bridge);
+      } else {
+        delete (bridge);
+        std::cout << "Ошибка при создании моста" << std::endl;
+      }
+    } else if (errno != EWOULDBLOCK) {
+      /*
+        Принятие не выполняется с ошибкой EWOULDBLOCK когда мы их всех приняли.
+        Любая другая ошибка завершает работу прокси-сервера.
+      */
+      std::cerr << "Ошибка принятия запроса на установление соединения"
+                << std::endl;
+      result_ = 0;
     }
-  }
+  } while (new_socket_ > -1);
+
+  sockets_ready_--;
 }
 
 void ProxyServer::ProcessConnections() {
-  for (auto bridges_iter = bridges_.begin(); bridges_iter != bridges_.end();) {
+  for (auto bridges_iter = bridges_.begin();
+       (bridges_iter != bridges_.end()) && (sockets_ready_ > 0);) {
     int client_socket = (*bridges_iter)->GetClientSocket();
     int server_socket = (*bridges_iter)->GetServerSocket();
     int result = 0;
 
     if (FD_ISSET(client_socket, &read_fd_set_)) {
+      std::cout << "Сокет клиента " << client_socket
+                << " доступен для чтения запроса\n";
       if ((result = (*bridges_iter)->RecvRequest()) == 0) {
         (*bridges_iter)->SetStatus(kSendRequest);
       }
+      sockets_ready_--;
     } else if (FD_ISSET(server_socket, &read_fd_set_)) {
+      std::cout << "Сокет psql " << server_socket
+                << " доступен для чтения ответа на запрос\n";
       if ((result = (*bridges_iter)->RecvResponse()) == 0) {
         (*bridges_iter)->SetStatus(kSendResponse);
       }
+      sockets_ready_--;
     }
 
     if (FD_ISSET(server_socket, &write_fd_set_)) {
+      std::cout << "Сокет psql " << server_socket
+                << " доступен для отправки запроса\n";
       if ((result = (*bridges_iter)->SendRequest()) == 0) {
         (*bridges_iter)->SetStatus(kRecvResponse);
       }
+      sockets_ready_--;
     } else if (FD_ISSET(client_socket, &write_fd_set_)) {
+      std::cout << "Сокет клиента " << client_socket
+                << " доступен для отправки ответа на запрос\n";
       if ((result = (*bridges_iter)->SendResponse()) == 0) {
         (*bridges_iter)->SetStatus(kRecvRequest);
       }
+      sockets_ready_--;
     }
 
     if (result < 0) {
       delete (*bridges_iter);
       bridges_iter = bridges_.erase(bridges_iter);
-      std::cout << "connection closed" << std::endl;
+      std::cout << "\nМост " << client_socket << " -- " << server_socket
+                << " закрыт\n"
+                << std::endl;
     } else {
       ++bridges_iter;
     }

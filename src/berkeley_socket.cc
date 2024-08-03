@@ -11,16 +11,18 @@ int BerkeleySocket::CreateServerSocket(const std::string &ip_address,
   result = CreateSocket(socket_fd);
 
   if (result > -1) {
-    SetReuseSockOpt(socket_fd);
+    result = SetReuseSockOpt(socket_fd);
+  }
+  if (result > -1) {
+    result = SetNonblockFD(socket_fd);
+  }
+  if (result > -1) {
     result = SetSockaddrIn(socket_fd, sockaddr, ip_address, port);
   }
-
   if (result > -1) {
     result = Bind(socket_fd, sockaddr);
   }
-
   if (result > -1) {
-    SetNonblockFD(socket_fd);
     Listen(socket_fd);
   }
 
@@ -36,16 +38,16 @@ int BerkeleySocket::CreateClientSocket(const std::string &ip_address,
   result = CreateSocket(socket_fd);
 
   if (result > -1) {
-    SetReuseSockOpt(socket_fd);
+    result = SetReuseSockOpt(socket_fd);
+  }
+  if (result > -1) {
+    result = SetNonblockFD(socket_fd);
+  }
+  if (result > -1) {
     result = SetSockaddrIn(socket_fd, sockaddr, ip_address, port);
   }
-
   if (result > -1) {
-    result = Connect(socket_fd, sockaddr);
-  }
-
-  if (result > -1) {
-    SetNonblockFD(socket_fd);
+    Connect(socket_fd, sockaddr);
   }
 
   return socket_fd;
@@ -59,9 +61,6 @@ int BerkeleySocket::Accept(int listener_fd) {
     удаленного хоста
   */
   socket_fd = accept(listener_fd, NULL, NULL);
-  CheckResult(socket_fd, socket_fd,
-              "Ошибка принятия запроса на установление соединения");
-
   if (socket_fd > -1) {
     SetNonblockFD(socket_fd);
   }
@@ -82,36 +81,38 @@ int BerkeleySocket::CreateSocket(int &socket_fd) {
   socket_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (socket_fd < 0) {
     result = -1;
-    std::cout << "ошибка при создании сокета" << std::endl;
+    std::cout << "Ошибка при создании сокета" << std::endl;
   }
 
   return result;
 }
 
-void BerkeleySocket::SetReuseSockOpt(int socket_fd) {
-  int reuse = 1;
+int BerkeleySocket::SetReuseSockOpt(int &socket_fd) {
+  int result = 0;
 
   /*
     Указывает, что правила, используемые при проверке адресов
     предоставленный в вызове bind() должен позволять повторное использование
     локального адреса
   */
-  if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuse,
-                 sizeof(reuse)) < 0) {
-    std::cout << "ошибка при установлении setsockopt(SO_REUSEADDR)"
-              << std::endl;
-  }
+  result = setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR,
+                      (const char *)&kReuse, sizeof(kReuse));
+  CheckResult(result, socket_fd,
+              "Ошибка при установлении setsockopt(SO_REUSEADDR)");
 
   /*
     Позволяет привязывать несколько сокетов на идентичный адрес сокета
   */
 #if defined(SO_REUSEPORT)
-  if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEPORT, (const char *)&reuse,
-                 sizeof(reuse)) < 0) {
-    std::cout << "ошибка при установлении setsockopt(SO_REUSEPORT)"
-              << std::endl;
+  if (result > -1) {
+    result = setsockopt(socket_fd, SOL_SOCKET, SO_REUSEPORT,
+                        (const char *)&kReuse, sizeof(kReuse));
+    CheckResult(result, socket_fd,
+                "Ошибка при установлении setsockopt(SO_REUSEPORT)");
   }
 #endif
+
+  return result;
 }
 
 int BerkeleySocket::SetSockaddrIn(int &socket_fd, struct sockaddr_in &sockaddr,
@@ -124,13 +125,13 @@ int BerkeleySocket::SetSockaddrIn(int &socket_fd, struct sockaddr_in &sockaddr,
   */
   if ((port < 1024) || (port > 65535)) {
     result = -1;
-    std::cout << "ошибка: не корректный порт" << std::endl;
+    std::cout << "Ошибка: не корректный порт" << std::endl;
   } else {
     sockaddr.sin_family = AF_INET;
     sockaddr.sin_port = htons(port);
     if (inet_pton(AF_INET, ip_address.c_str(), &sockaddr.sin_addr) == 0) {
       result = -1;
-      std::cout << "ошибка: не корректный IP-адрес" << std::endl;
+      std::cout << "Ошибка: не корректный IP-адрес" << std::endl;
     }
   }
   CheckResult(result, socket_fd, "Ошибка SetSockaddrIn");
@@ -146,14 +147,14 @@ int BerkeleySocket::Bind(int &socket_fd, const struct sockaddr_in &sockaddr) {
   */
   result = bind(socket_fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
   CheckResult(result, socket_fd,
-              "ошибка связывания сокета с конкретным адресом");
+              "Ошибка связывания сокета с конкретным адресом");
 
   return result;
 }
 
-void BerkeleySocket::SetNonblockFD(int fd) {
+int BerkeleySocket::SetNonblockFD(int &fd) {
   int flags{};
-  int result;
+  int result = 0;
 
   /*
     O_NONBLOCK - устанавливает  режим  неблокирования (стандартизировано POSIX)
@@ -170,9 +171,9 @@ void BerkeleySocket::SetNonblockFD(int fd) {
   result = ioctl(fd, FIONBIO, &flags);
 #endif
 
-  if (result < 0) {
-    std::cout << "ошибка при установлении режима неблокирования" << std::endl;
-  }
+  CheckResult(result, fd, "Ошибка при установлении режима неблокирования");
+
+  return result;
 }
 
 int BerkeleySocket::Listen(int &socket_fd) {
@@ -192,8 +193,8 @@ int BerkeleySocket::Listen(int &socket_fd) {
 
 int BerkeleySocket::Connect(int &socket_fd,
                             const struct sockaddr_in &sockaddr) {
-  int connect_count{};
   bool is_not_connect{};
+  int connect_count{};
   int result = 0;
 
   /*

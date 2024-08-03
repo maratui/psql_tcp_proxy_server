@@ -92,19 +92,22 @@ int Bridge::Recv(int socket_fd, struct message_s &message) {
     }
   } while (read_bytes_ > 0);
 
+  std::cout << "recv = " << read_bytes_ << "; errno = " << errno
+            << "; EAGAIN = " << EAGAIN << "; EWOULDBLOCK = " << EWOULDBLOCK
+            << std::endl;
   /*
     Получаем данные по этому соединению до тех пор,
     пока не установится EWOULDBLOCK или EAGAIN.
     Если будут другие ошибки, то произошел сбой и мы закроем связь.
   */
-  if (errno == EWOULDBLOCK) {
+  if ((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
     if (message.string.length() == message.length) {
       read_bytes_ = 0;
     } else {
       read_bytes_ = 1;
     }
-  } else if (errno == EAGAIN) {
-    read_bytes_ = 1;
+  } else {
+    read_bytes_ = -1;
   }
 
   return read_bytes_;
@@ -118,15 +121,22 @@ int Bridge::Send(int socket_fd, struct message_s &message) {
       message.sent_length += write_bytes_;
       message.length -= write_bytes_;
     }
+  } while (write_bytes_ > 0);
+
+  std::cout << "send = " << write_bytes_ << "; errno = " << errno
+            << "; EAGAIN = " << EAGAIN << "; EWOULDBLOCK = " << EWOULDBLOCK
+            << std::endl;
+
+  if ((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
     if (message.length == 0) {
       message.string.clear();
       message.sent_length = 0;
       write_bytes_ = 0;
+    } else {
+      write_bytes_ = 1;
     }
-  } while (write_bytes_ > 0);
-
-  if ((write_bytes_ == 0) && (message.length > 0)) {
-    write_bytes_ = 1;
+  } else {
+    write_bytes_ = -1;
   }
 
   return write_bytes_;
