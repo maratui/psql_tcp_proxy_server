@@ -32,7 +32,7 @@ class Bridge {
 
   static const inline std::string kLocalHost = "127.0.0.1";
   static const int kPSQLPortNumber = 5432;
-  static const int kBufLen = 1024;
+  static const int kBufLen = 10240;
 
   Bridge() = delete;
   Bridge(const Bridge &other) = delete;

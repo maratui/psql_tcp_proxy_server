@@ -1,10 +1,12 @@
-#include <iostream>
-
-#include "proxy_server.h"
+#include "supervisor.h"
 
 int main(int argc, char *argv[]) {
   if (argc == 3) {
     psql_tcp::ProxyServer proxy_server(argv);
+
+    supervisor.SetProxyServer(&proxy_server);
+    signal(SIGINT, SignalHandler);
+    signal(SIGTERM, SignalHandler);
 
     proxy_server.Run();
   } else {

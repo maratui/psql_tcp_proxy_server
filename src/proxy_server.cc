@@ -15,14 +15,21 @@ ProxyServer::ProxyServer(char *argv[]) {
 }
 
 ProxyServer::~ProxyServer() {
+  std::cout << "\nЗапущен деструктор прокси-сервера ..." << std::endl;
   if (client_listener_ > -1) {
     shutdown(client_listener_, SHUT_RDWR);
     close(client_listener_);
+    std::cout << "  закрыт сокет прослушивания " << client_listener_
+              << std::endl;
   }
+  std::cout
+      << "  запускаем деструкторы всех существующих мостов в количестве = "
+      << bridges_.size() << " ..." << std::endl;
   for (auto bridges_iter = bridges_.begin(); bridges_iter != bridges_.end();
        ++bridges_iter) {
     delete (*bridges_iter);
   }
+  std::cout << "Прокси-сервер успешно остановлен." << std::endl;
 }
 
 void ProxyServer::Run() {
@@ -39,15 +46,15 @@ void ProxyServer::Run() {
       select() - позволяяет приложениям мультиплексировать свои операции
       ввода-вывода
     */
-    std::cout << "Ожидание select() ..." << std::endl;
-    // std::cin >> result_;
+    std::cout << "\nОжидание select() ..." << std::endl;
+    std::cin >> result_;
     result_ =
         select(max_socket_ + 1, &read_fd_set_, &write_fd_set_, NULL, NULL);
     CheckResult(result_, "Ошибка select()");
 
     if (result_ > 0) {
       sockets_ready_ = result_;
-      std::cout << sockets_ready_ << " сокетов готовы к обработке "
+      std::cout << "  " << sockets_ready_ << " сокетов готовы к обработке "
                 << std::endl;
       if (FD_ISSET(client_listener_, &read_fd_set_)) {
         AcceptConnection();
@@ -97,12 +104,12 @@ void ProxyServer::AcceptConnection() {
     if (new_socket_ > -1) {
       Bridge *bridge = new Bridge(new_socket_, kRecvRequest);
 
-      std::cout << "Новое входящее соединение - " << new_socket_ << std::endl;
+      std::cout << "  новое входящее соединение - " << new_socket_ << std::endl;
       if (bridge->GetServerSocket() > -1) {
         bridges_.push_back(bridge);
       } else {
         delete (bridge);
-        std::cout << "Ошибка при создании моста" << std::endl;
+        std::cout << "  ошибка при создании моста" << std::endl;
       }
     } else if (errno != EWOULDBLOCK) {
       /*
@@ -160,7 +167,7 @@ void ProxyServer::ProcessConnections() {
     if (result < 0) {
       delete (*bridges_iter);
       bridges_iter = bridges_.erase(bridges_iter);
-      std::cout << "\nМост " << client_socket << " -- " << server_socket
+      std::cout << "\nМост " << client_socket << " ---> " << server_socket
                 << " закрыт\n"
                 << std::endl;
     } else {

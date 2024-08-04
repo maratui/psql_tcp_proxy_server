@@ -19,13 +19,16 @@ Bridge::Bridge(int socket_fd, int status)
 }
 
 Bridge::~Bridge() {
+  std::cout << "\nЗапущен деструктор моста ..." << std::endl;
   if (client_socket_ > -1) {
     shutdown(client_socket_, SHUT_RDWR);
     close(client_socket_);
+    std::cout << "  закрыт сокет клиента " << client_socket_ << std::endl;
   }
   if (psql_socket_ > -1) {
     shutdown(psql_socket_, SHUT_RDWR);
     close(psql_socket_);
+    std::cout << "  закрыт сокет сервера psql " << psql_socket_ << std::endl;
   }
 }
 
@@ -79,6 +82,8 @@ int Bridge::Recv(int socket_fd, struct message_s &message) {
   */
   do {
     read_bytes_ = recv(socket_fd, buf_, kBufLen, MSG_NOSIGNAL);
+    std::cout << "  recv = " << read_bytes_ << "; errno = " << errno
+              << "; EWOULDBLOCK = " << EWOULDBLOCK << std::endl;
     if (read_bytes_ > 0) {
       message.string.append(buf_, read_bytes_);
 
@@ -92,21 +97,30 @@ int Bridge::Recv(int socket_fd, struct message_s &message) {
     }
   } while (read_bytes_ > 0);
 
-  std::cout << "recv = " << read_bytes_ << "; errno = " << errno
-            << "; EAGAIN = " << EAGAIN << "; EWOULDBLOCK = " << EWOULDBLOCK
-            << std::endl;
   /*
     Получаем данные по этому соединению до тех пор,
-    пока не установится EWOULDBLOCK или EAGAIN.
-    Если будут другие ошибки, то произошел сбой и мы закроем связь.
+    пока не установится EWOULDBLOCK.
+    Если будут другие ошибки, то произошел сбой и мы закроем мост.
   */
-  if ((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
-    if (message.string.length() == message.length) {
-      read_bytes_ = 0;
+  if (read_bytes_ < 0) {
+    if (errno == EWOULDBLOCK) {
+      if (message.string.length() == message.length) {
+        std::cout << "  прием сообщения завершен; длина сообщения = "
+                  << message.length << std::endl;
+        read_bytes_ = 0;
+      } else {
+        std::cout << "  нужно еще принимать сообщение; получено = "
+                  << message.string.length() << "; нужно еще = "
+                  << message.length - message.string.length() << std::endl;
+        read_bytes_ = 1;
+      }
     } else {
-      read_bytes_ = 1;
+      std::cout << "  recv = " << read_bytes_ << " - ошибка = " << errno
+                << std::endl;
     }
   } else {
+    std::cout << "  recv = " << read_bytes_
+              << " - соединение было закрыто клиентом" << std::endl;
     read_bytes_ = -1;
   }
 
@@ -117,26 +131,36 @@ int Bridge::Send(int socket_fd, struct message_s &message) {
   do {
     write_bytes_ = send(socket_fd, message.string.c_str() + message.sent_length,
                         message.length, MSG_NOSIGNAL);
+    std::cout << "  send = " << write_bytes_ << "; errno = " << errno
+              << "; EAGAIN = " << EAGAIN << std::endl;
     if (write_bytes_ > 0) {
       message.sent_length += write_bytes_;
       message.length -= write_bytes_;
     }
   } while (write_bytes_ > 0);
 
-  std::cout << "send = " << write_bytes_ << "; errno = " << errno
-            << "; EAGAIN = " << EAGAIN << "; EWOULDBLOCK = " << EWOULDBLOCK
-            << std::endl;
-
-  if ((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
-    if (message.length == 0) {
-      message.string.clear();
-      message.sent_length = 0;
-      write_bytes_ = 0;
+  if (write_bytes_ == 0) {
+    if (errno == EAGAIN) {
+      if (message.length == 0) {
+        std::cout << "  отправка сообщения завершена; длина отправленного "
+                     "сообщения = "
+                  << message.sent_length << std::endl;
+        message.string.clear();
+        message.sent_length = 0;
+      } else {
+        std::cout << "  нужно еще отправлять сообщение; отправлено = "
+                  << message.sent_length << "; нужно еще = " << message.length
+                  << std::endl;
+        write_bytes_ = 1;
+      }
     } else {
-      write_bytes_ = 1;
+      std::cout << "  send = " << write_bytes_ << " - ошибка = " << errno
+                << std::endl;
+      write_bytes_ = -1;
     }
   } else {
-    write_bytes_ = -1;
+    std::cout << "  send = " << write_bytes_ << " - ошибка = " << errno
+              << std::endl;
   }
 
   return write_bytes_;
