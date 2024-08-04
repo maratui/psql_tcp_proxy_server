@@ -8,9 +8,7 @@
 class Supervisor {
  public:
   Supervisor() = default;
-  ~Supervisor() {
-    std::cout << "Выполнен деструктор супервайзера." << std::endl;
-  }
+  ~Supervisor() = default;
 
   void SetProxyServer(psql_tcp::ProxyServer *proxy_server) {
     proxy_server_ = proxy_server;
@@ -34,8 +32,11 @@ class Supervisor {
 Supervisor supervisor;
 
 void SignalHandler(int signal) {
-  (void)signal;
-  std::cout << "\nПолучен ctrl + c" << std::endl;
+  if (signal == SIGINT) {
+    std::cout << "\nПолучен сигнал завершения Ctrl+с" << std::endl;
+  } else if (signal == SIGTERM) {
+    std::cout << "\nПолучен сигнал завершения от команды kill" << std::endl;
+  }
   supervisor.StopProxyServer();
   exit(EXIT_SUCCESS);
 }

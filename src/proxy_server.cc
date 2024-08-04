@@ -42,7 +42,7 @@ void ProxyServer::Run() {
   */
 #if defined(LEAK_CHECK)
   timeout = new struct timeval;
-  timeout->tv_sec = 60;
+  timeout->tv_sec = 30;
   timeout->tv_usec = 0;
 #endif
 
@@ -80,7 +80,7 @@ void ProxyServer::Run() {
       ProcessConnections();
     } else if (result_ == 0) {
       std::cout << "  select() завершился с результатом 0" << std::endl;
-      std::cout << "Завершение работы приложения ..." << std::endl;
+      std::cout << "Завершение работы прокси-сервера ..." << std::endl;
     }
   }
 
@@ -203,6 +203,6 @@ void ProxyServer::ProcessConnections() {
 void ProxyServer::CheckResult(int result, const std::string &log_text) {
   if (result < 0) {
     std::cerr << log_text << std::endl;
-    std::cout << "Завершение работы приложения ..." << std::endl;
+    std::cout << "Завершение работы прокси-сервера ..." << std::endl;
   }
 }
