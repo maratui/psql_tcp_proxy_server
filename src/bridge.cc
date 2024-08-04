@@ -40,7 +40,7 @@ int Bridge::RecvRequest() {
   int result{};
 
   result = Recv(client_socket_, client_request_);
-  if ((result == 0) && (errno == EWOULDBLOCK)) {
+  if (result == 0) {
     if ((client_request_.length > 5) && (client_request_.string[0] == 'Q')) {
       WriteQueryToLog(
           client_request_.string.substr(5, client_request_.length - 6));

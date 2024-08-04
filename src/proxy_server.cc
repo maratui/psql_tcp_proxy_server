@@ -29,15 +29,28 @@ ProxyServer::~ProxyServer() {
        ++bridges_iter) {
     delete (*bridges_iter);
   }
-  std::cout << "Прокси-сервер успешно остановлен." << std::endl;
+  std::cout << "\nПрокси-сервер успешно остановлен." << std::endl;
 }
 
 void ProxyServer::Run() {
+  struct timeval *timeout = nullptr;
+
+  result_ = client_listener_;
+
+  /*
+    в случае проверки работы прокси-сервера на утечки памяти
+  */
+#if defined(LEAK_CHECK)
+  timeout = new struct timeval;
+  timeout->tv_sec = 60;
+  timeout->tv_usec = 0;
+#endif
+
   /*
     Циклическое ожидание входящих соединений или входящих данных
     на любом из подключенных сокетов.
   */
-  do {
+  while (result_ > 0) {
     FD_ZERO(&read_fd_set_);
     FD_ZERO(&write_fd_set_);
     SetFDSet();
@@ -47,9 +60,14 @@ void ProxyServer::Run() {
       ввода-вывода
     */
     std::cout << "\nОжидание select() ..." << std::endl;
-    std::cin >> result_;
+
+#if defined(MAN_MODE)  // в случае сборки с пошаговым режимом работы
+                       // прокси-сервера
+    std::cin.get();
+#endif
+
     result_ =
-        select(max_socket_ + 1, &read_fd_set_, &write_fd_set_, NULL, NULL);
+        select(max_socket_ + 1, &read_fd_set_, &write_fd_set_, NULL, timeout);
     CheckResult(result_, "Ошибка select()");
 
     if (result_ > 0) {
@@ -61,10 +79,14 @@ void ProxyServer::Run() {
       }
       ProcessConnections();
     } else if (result_ == 0) {
-      std::cout << "select() завершился с результатом 0." << std::endl;
-      std::cout << "Завершение работы приложения" << std::endl;
+      std::cout << "  select() завершился с результатом 0" << std::endl;
+      std::cout << "Завершение работы приложения ..." << std::endl;
     }
-  } while (result_ > 0);
+  }
+
+#if defined(LEAK_CHECK)
+  delete timeout;
+#endif
 }
 
 void ProxyServer::SetFDSet() {
@@ -106,6 +128,8 @@ void ProxyServer::AcceptConnection() {
 
       std::cout << "  новое входящее соединение - " << new_socket_ << std::endl;
       if (bridge->GetServerSocket() > -1) {
+        std::cout << "  создали новый мост " << bridge->GetClientSocket()
+                  << " ---> " << bridge->GetServerSocket() << std::endl;
         bridges_.push_back(bridge);
       } else {
         delete (bridge);
@@ -179,7 +203,6 @@ void ProxyServer::ProcessConnections() {
 void ProxyServer::CheckResult(int result, const std::string &log_text) {
   if (result < 0) {
     std::cerr << log_text << std::endl;
-    std::cout << "Завершение работы приложения" << std::endl;
-    exit(EXIT_FAILURE);
+    std::cout << "Завершение работы приложения ..." << std::endl;
   }
 }

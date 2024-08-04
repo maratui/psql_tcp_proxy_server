@@ -1,3 +1,16 @@
+sudo -u postgres psql
+CREATE USER sbtest WITH PASSWORD 'password';
+CREATE DATABASE sbtest;
+GRANT ALL PRIVILEGES ON DATABASE sbtest TO sbtest;
+SHOW hba_file;
+sudo vim /etc/postgresql/14/main/pg_hba.conf
+host     sbtest          sbtest          0.0.0.0/0               scram-sha-256
+SHOW config_file;
+sudo vim /etc/postgresql/14/main/postgresql.conf
+#ssl = on
+select pg_reload_conf();
+psql -U sbtest -h localhost -p 5432 -d sbtest
+
 sudo sysbench --db-driver=pgsql --oltp-table-size=100000 --oltp-tables-count=24 --threads=1 --pgsql-port=8080 --pgsql-user=sbtest --pgsql-password=password --pgsql-db=sbtest /usr/share/sysbench/tests/include/oltp_legacy/parallel_prepare.lua run
 
 drop table sbtest1, sbtest2, sbtest3, sbtest4, sbtest5, sbtest6, sbtest7, sbtest8, sbtest9, sbtest10, sbtest11, sbtest12, sbtest13, sbtest14, sbtest15, sbtest16, sbtest17, sbtest18, sbtest19, sbtest20, sbtest21, sbtest22, sbtest23, sbtest24;
