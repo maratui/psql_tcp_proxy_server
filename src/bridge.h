@@ -1,6 +1,7 @@
 #ifndef PSQL_TCP_PROXY_SERVER_BRIDGE_H_
 #define PSQL_TCP_PROXY_SERVER_BRIDGE_H_
 
+#include <algorithm>
 #include <fstream>
 
 #include "berkeley_socket.h"

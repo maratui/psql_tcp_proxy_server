@@ -43,8 +43,11 @@ int Bridge::RecvRequest() {
   result = Recv(client_socket_, client_request_);
   if (result == 0) {
     if ((client_request_.length > 5) && (client_request_.string[0] == 'Q')) {
-      result = WriteQueryToLog(
-          client_request_.string.substr(5, client_request_.length - 6));
+      std::string str =
+          client_request_.string.substr(5, client_request_.length - 6);
+
+      str.erase(std::remove(str.begin(), str.end(), '\n'), str.end());
+      result = WriteQueryToLog(str);
     }
   }
 
