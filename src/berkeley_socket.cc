@@ -115,43 +115,6 @@ int BerkeleySocket::SetReuseSockOpt(int &socket_fd) {
   return result;
 }
 
-int BerkeleySocket::SetSockaddrIn(int &socket_fd, struct sockaddr_in &sockaddr,
-                                  const std::string &ip_address,
-                                  unsigned port) {
-  int result = 0;
-
-  /*
-    cтруктура sockaddr_in описывает сокет для работы с протоколами IP
-  */
-  if ((port < 1024) || (port > 65535)) {
-    result = -1;
-    std::cout << "Ошибка: не корректный порт" << std::endl;
-  } else {
-    sockaddr.sin_family = AF_INET;
-    sockaddr.sin_port = htons(port);
-    if (inet_pton(AF_INET, ip_address.c_str(), &sockaddr.sin_addr) == 0) {
-      result = -1;
-      std::cout << "Ошибка: не корректный IP-адрес" << std::endl;
-    }
-  }
-  CheckResult(result, socket_fd, "Ошибка SetSockaddrIn");
-
-  return result;
-}
-
-int BerkeleySocket::Bind(int &socket_fd, const struct sockaddr_in &sockaddr) {
-  int result = 0;
-
-  /*
-    bind() - связывает сокет с конкретным адресом
-  */
-  result = bind(socket_fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
-  CheckResult(result, socket_fd,
-              "Ошибка связывания сокета с конкретным адресом");
-
-  return result;
-}
-
 int BerkeleySocket::SetNonblockFD(int &fd) {
   int flags{};
   int result = 0;
@@ -172,6 +135,43 @@ int BerkeleySocket::SetNonblockFD(int &fd) {
 #endif
 
   CheckResult(result, fd, "Ошибка при установлении режима неблокирования");
+
+  return result;
+}
+
+int BerkeleySocket::SetSockaddrIn(int &socket_fd, struct sockaddr_in &sockaddr,
+                                  const std::string &ip_address,
+                                  unsigned port) {
+  int result = 0;
+
+  /*
+    cтруктура sockaddr_in описывает сокет для работы с протоколами IP
+  */
+  if ((port < 1024) || (port > 65535)) {
+    result = -1;
+    std::cout << "Ошибка: не корректный порт" << std::endl;
+  } else {
+    sockaddr.sin_family = AF_INET;
+    sockaddr.sin_port = htons(port);
+    if (inet_pton(AF_INET, ip_address.c_str(), &sockaddr.sin_addr) == 0) {
+      result = -1;
+      std::cout << "Ошибка: не корректный IP-адрес" << std::endl;
+    }
+  }
+  CheckResult(result, socket_fd, "Ошибка SetSockaddrIn()");
+
+  return result;
+}
+
+int BerkeleySocket::Bind(int &socket_fd, const struct sockaddr_in &sockaddr) {
+  int result = 0;
+
+  /*
+    bind() - связывает сокет с конкретным адресом
+  */
+  result = bind(socket_fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
+  CheckResult(result, socket_fd,
+              "Ошибка связывания сокета с конкретным адресом");
 
   return result;
 }
@@ -220,10 +220,6 @@ void BerkeleySocket::CheckResult(int result, int &socket_fd,
   if (result < 0) {
     close(socket_fd);
     socket_fd = -1;
-    if (errno) {
-      std::cerr << log_text << ": " << std::strerror(errno) << std::endl;
-    } else {
-      std::cerr << log_text << std::endl;
-    }
+    std::cout << log_text << std::endl;
   }
 }

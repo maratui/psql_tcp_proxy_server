@@ -4,7 +4,6 @@
 #include <list>
 #include <sstream>
 
-#include "berkeley_socket.h"
 #include "bridge.h"
 
 namespace psql_tcp {
@@ -16,7 +15,8 @@ class ProxyServer {
   void Run();
 
  private:
-  const static inline std::string kLocalHost = "127.0.0.1";
+  static const inline std::string kLocalHost = "127.0.0.1";
+
   enum { kRecvRequest, kSendRequest, kRecvResponse, kSendResponse };
 
   ProxyServer() = delete;
@@ -30,15 +30,15 @@ class ProxyServer {
   void ProcessConnections();
   void CheckResult(int result, const std::string &log_text);
 
+  std::list<Bridge *> bridges_;
+
   int client_listener_{};
   int new_socket_{};
   int sockets_ready_{};
 
-  fd_set read_fd_set_;
-  fd_set write_fd_set_;
+  fd_set read_fd_set_{};
+  fd_set write_fd_set_{};
   int max_socket_{};
-
-  std::list<Bridge *> bridges_;
 
   int result_{};
 };

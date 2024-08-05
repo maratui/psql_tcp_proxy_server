@@ -40,7 +40,7 @@ class Bridge {
   void operator=(const Bridge &other) = delete;
   void operator=(const Bridge &&other) = delete;
 
-  static void WriteQueryToLog(const std::string &query);
+  static int WriteQueryToLog(const std::string &query);
 
   int Recv(int socket_fd, struct message_s &message);
   int Send(int socket_fd, struct message_s &message);

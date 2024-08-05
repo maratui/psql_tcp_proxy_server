@@ -11,7 +11,9 @@ ProxyServer::ProxyServer(char *argv[]) {
       BerkeleySocket::CreateServerSocket(kLocalHost, proxy_server_port);
   CheckResult(client_listener_, "Ошибка создания сокета прокси-сервера");
 
-  Bridge::SetFilename(argv[2]);
+  if (client_listener_ > -1) {
+    Bridge::SetFilename(argv[2]);
+  }
 }
 
 ProxyServer::~ProxyServer() {
@@ -22,12 +24,14 @@ ProxyServer::~ProxyServer() {
     std::cout << "  закрыт сокет прослушивания " << client_listener_
               << std::endl;
   }
-  std::cout
-      << "  запускаем деструкторы всех существующих мостов в количестве = "
-      << bridges_.size() << " ..." << std::endl;
-  for (auto bridges_iter = bridges_.begin(); bridges_iter != bridges_.end();
-       ++bridges_iter) {
-    delete (*bridges_iter);
+  if (bridges_.size() > 0) {
+    std::cout
+        << "  запускаем деструкторы всех существующих мостов в количестве = "
+        << bridges_.size() << " ..." << std::endl;
+    for (auto bridges_iter = bridges_.begin(); bridges_iter != bridges_.end();
+         ++bridges_iter) {
+      delete (*bridges_iter);
+    }
   }
   std::cout << "\nПрокси-сервер успешно остановлен." << std::endl;
 }
@@ -42,7 +46,7 @@ void ProxyServer::Run() {
   */
 #if defined(LEAK_CHECK)
   timeout = new struct timeval;
-  timeout->tv_sec = 30;
+  timeout->tv_sec = 15;
   timeout->tv_usec = 0;
 #endif
 
@@ -54,18 +58,20 @@ void ProxyServer::Run() {
     FD_ZERO(&read_fd_set_);
     FD_ZERO(&write_fd_set_);
     SetFDSet();
+    std::cout << "\nОжидание select() ..." << std::endl;
+
+    /*
+      в случае сборки с пошаговым режимом работы прокси-сервера
+    */
+#if defined(MAN_MODE)
+    std::cout << "Для продожения нажмите Enter" << std::endl;
+    std::cin.get();
+#endif
 
     /*
       select() - позволяяет приложениям мультиплексировать свои операции
       ввода-вывода
     */
-    std::cout << "\nОжидание select() ..." << std::endl;
-
-#if defined(MAN_MODE)  // в случае сборки с пошаговым режимом работы
-                       // прокси-сервера
-    std::cin.get();
-#endif
-
     result_ =
         select(max_socket_ + 1, &read_fd_set_, &write_fd_set_, NULL, timeout);
     CheckResult(result_, "Ошибка select()");
@@ -77,7 +83,9 @@ void ProxyServer::Run() {
       if (FD_ISSET(client_listener_, &read_fd_set_)) {
         AcceptConnection();
       }
-      ProcessConnections();
+      if (result_ > 0) {
+        ProcessConnections();
+      }
     } else if (result_ == 0) {
       std::cout << "  select() завершился с результатом 0" << std::endl;
       std::cout << "Завершение работы прокси-сервера ..." << std::endl;
@@ -124,24 +132,25 @@ void ProxyServer::AcceptConnection() {
     new_socket_ = BerkeleySocket::Accept(client_listener_);
 
     if (new_socket_ > -1) {
+      std::cout << "  новое входящее соединение - " << new_socket_ << std::endl;
       Bridge *bridge = new Bridge(new_socket_, kRecvRequest);
 
-      std::cout << "  новое входящее соединение - " << new_socket_ << std::endl;
       if (bridge->GetServerSocket() > -1) {
         std::cout << "  создали новый мост " << bridge->GetClientSocket()
                   << " ---> " << bridge->GetServerSocket() << std::endl;
         bridges_.push_back(bridge);
       } else {
-        delete (bridge);
         std::cout << "  ошибка при создании моста" << std::endl;
+        delete (bridge);
       }
     } else if (errno != EWOULDBLOCK) {
       /*
         Принятие не выполняется с ошибкой EWOULDBLOCK когда мы их всех приняли.
         Любая другая ошибка завершает работу прокси-сервера.
       */
-      std::cerr << "Ошибка принятия запроса на установление соединения"
+      std::cout << "Ошибка принятия запроса на установление соединения"
                 << std::endl;
+      std::cout << "Завершение работы прокси-сервера ..." << std::endl;
       result_ = 0;
     }
   } while (new_socket_ > -1);
@@ -202,7 +211,7 @@ void ProxyServer::ProcessConnections() {
 
 void ProxyServer::CheckResult(int result, const std::string &log_text) {
   if (result < 0) {
-    std::cerr << log_text << std::endl;
+    std::cout << log_text << std::endl;
     std::cout << "Завершение работы прокси-сервера ..." << std::endl;
   }
 }

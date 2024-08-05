@@ -37,7 +37,7 @@ cppcheck:
 	 -UO_NONBLOCK -USO_REUSEPORT $(FILES)
 
 ## make valgrind: проверить работу прокси-сервера на утечки памяти
-valgrind: clean
+valgrind:
 	@ mkdir -p build
 	@ cd build && \
 	 $(CC) $(CFLAGS) -DLEAK_CHECK ../*.cc -o ./$(TARGET) && \

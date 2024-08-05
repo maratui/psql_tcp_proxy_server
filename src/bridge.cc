@@ -30,6 +30,7 @@ Bridge::~Bridge() {
     close(psql_socket_);
     std::cout << "  закрыт сокет сервера psql " << psql_socket_ << std::endl;
   }
+  std::cout << std::endl;
 }
 
 void Bridge::SetFilename(const std::string &filename) noexcept {
@@ -42,7 +43,7 @@ int Bridge::RecvRequest() {
   result = Recv(client_socket_, client_request_);
   if (result == 0) {
     if ((client_request_.length > 5) && (client_request_.string[0] == 'Q')) {
-      WriteQueryToLog(
+      result = WriteQueryToLog(
           client_request_.string.substr(5, client_request_.length - 6));
     }
   }
@@ -64,15 +65,21 @@ int Bridge::GetStatus() const noexcept { return status_; }
 
 void Bridge::SetStatus(int status) noexcept { status_ = status; }
 
-void Bridge::WriteQueryToLog(const std::string &query) {
+int Bridge::WriteQueryToLog(const std::string &query) {
   std::ofstream out(filename_.c_str(), std::ios::app);
+  int result = 0;
 
   if (out.is_open()) {
     out << std::endl << query << std::endl;
     out.close();
   } else {
-    std::cerr << "Ошибка открытия лог файла" << std::endl;
+    std::cout << "-------------------------------------------------------------"
+                 "---------------Ошибка открытия лог файла"
+              << std::endl;
+    result = -1;
   }
+
+  return result;
 }
 
 int Bridge::Recv(int socket_fd, struct message_s &message) {
@@ -169,6 +176,9 @@ int Bridge::Send(int socket_fd, struct message_s &message) {
 long unsigned Bridge::GetMessageLength(const std::string &message) {
   long unsigned message_length = 0LU;
 
+  /*
+    https://www.postgresql.org/docs/9.5/protocol-message-formats.html
+  */
   if (message.length() >= 5) {
     message_length = (long unsigned)((unsigned char)(message[1]) << 24 |
                                      (unsigned char)(message[2]) << 16 |

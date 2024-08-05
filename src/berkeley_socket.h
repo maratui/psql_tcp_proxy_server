@@ -2,11 +2,14 @@
 #define PSQL_TCP_PROXY_SERVER_BERKELEY_SOCKET_H_
 
 #include <arpa/inet.h>
+#include <errno.h>
 #include <fcntl.h>
+#include <netinet/in.h>
 #include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 
-#include <cstring>
 #include <iostream>
 #include <string>
 
